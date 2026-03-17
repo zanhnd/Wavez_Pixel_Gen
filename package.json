@@ -1,0 +1,29 @@
+{
+  "name": "pixel-art-processor",
+  "version": "1.0.0",
+  "description": "Tự động biến ảnh thường thành pixel art data cho Draw by Pixel",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "web": "start src/index.html"
+  },
+  "build": {
+    "appId": "com.pixelart.processor",
+    "productName": "Pixel Art Processor",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Art Processor</title>
+  <meta name="description" content="Tự động biến ảnh thường thành pixel art cho Draw by Pixel">
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ═══ Top Bar ═══ -->
+    <header class="topbar">
+      <div class="topbar__icon">🎨</div>
+      <span class="topbar__title">Pixel Art Processor</span>
+      <span class="topbar__subtitle" id="statusText">Chờ ảnh…</span>
+    </header>
+
+    <!-- ═══ Main ═══ -->
+    <div class="main">
+      <!-- Preview Area -->
+      <section class="preview">
+        <div class="preview__canvases">
+          <!-- Input Canvas -->
+          <div class="canvas-card">
+            <div class="canvas-card__header">
+              <span class="canvas-card__label">Ảnh gốc</span>
+              <div class="zoom-controls" id="inputZoomControls" style="display:none">
+                <button class="zoom-btn" data-target="input" data-action="out">−</button>
+                <span class="zoom-level" id="inputZoomLevel">100%</span>
+                <button class="zoom-btn" data-target="input" data-action="in">+</button>
+                <button class="zoom-btn zoom-btn--fit" data-target="input" data-action="fit">Fit</button>
+              </div>
+              <span class="canvas-card__dim" id="inputDim">—</span>
+            </div>
+            <div class="canvas-card__body" id="inputBody">
+              <div class="empty-state" id="inputEmpty">
+                <span class="empty-state__icon">🖼️</span>
+                <span>Kéo thả ảnh vào bên phải →</span>
+              </div>
+              <canvas id="inputCanvas" style="display:none"></canvas>
+            </div>
+          </div>
+
+          <!-- Output Canvas -->
+          <div class="canvas-card">
+            <div class="canvas-card__header">
+              <span class="canvas-card__label">Pixel Art</span>
+              <div class="zoom-controls" id="outputZoomControls" style="display:none">
+                <button class="zoom-btn" data-target="output" data-action="out">−</button>
+                <span class="zoom-level" id="outputZoomLevel">100%</span>
+                <button class="zoom-btn" data-target="output" data-action="in">+</button>
+                <button class="zoom-btn zoom-btn--fit" data-target="output" data-action="fit">Fit</button>
+              </div>
+              <span class="canvas-card__dim" id="outputDim">—</span>
+            </div>
+            <div class="canvas-card__body" id="outputBody">
+              <div class="empty-state" id="outputEmpty">
+                <span class="empty-state__icon">✨</span>
+                <span>Kết quả xuất hiện ở đây</span>
+              </div>
+              <canvas id="outputCanvas" style="display:none"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Palette Bar -->
+        <div class="palette-bar" id="paletteBar" style="display:none">
+          <div class="palette-bar__header">
+            <span class="palette-bar__title">Bảng màu đầu ra</span>
+            <span class="palette-bar__count" id="paletteCount">0 màu</span>
+          </div>
+          <div class="palette-bar__colors" id="paletteColors"></div>
+        </div>
+      </section>
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <!-- Drop Zone -->
+        <div class="dropzone" id="dropzone">
+          <div class="sidebar__section">
+            <span class="upload-icon">📁</span>
+            <p>Kéo thả ảnh vào đây<br>hoặc click để chọn</p>
+            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+            <!-- Danh sách file hàng loạt -->
+            <div id="batchFileList" style="display:none; margin-top:12px; font-size:12px; color:var(--md-on-surface-variant); text-align:left; max-height:80px; overflow-y:auto; width:100%;"></div>
+          </div>
+        </div><!-- Auto-detected Info -->
+        <div class="control-group" id="infoGroup" style="display:none">
+          <span class="control-group__label">Thông tin phát hiện</span>
+          <div class="info-row">
+            <span class="chip" id="chipCellSize">Cell: —</span>
+            <span class="chip" id="chipOrigSize">Gốc: —</span>
+          </div>
+          <div class="info-row">
+            <span class="chip chip--accent" id="chipUniqueColors">— màu</span>
+            <span class="badge" id="badgeRecommend">Đề xuất: —</span>
+          </div>
+        </div>
+
+        <!-- Processing Mode -->
+        <div class="control-group">
+          <label class="control-group__label">
+            Chế độ xử lý
+            <span class="info-icon">?<span class="info-tooltip"><b>Ảnh thường:</b> Bỏ qua lưới pixel, thu nhỏ ảnh mượt mà thích hợp cho ảnh chụp thật.<br><br><b>Dithering:</b> Trộn các hạt màu để tạo hiệu ứng chuyển tiếp mềm mại (gradient) khi bị giới hạn số lượng màu.</span></span>
+          </label>
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; margin-bottom:8px;">
+            <input type="checkbox" id="photoMode" style="width:16px; height:16px; accent-color:var(--md-primary);">
+            <span>Ảnh thường (Bỏ qua lưới, resize mượt)</span>
+          </label>
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+            <input type="checkbox" id="ditherMode" style="width:16px; height:16px; accent-color:var(--md-primary);">
+            <span>Làm mượt phổ màu (Dithering)</span>
+          </label>
+        </div>
+
+        <!-- Outline -->
+        <div class="control-group">
+          <label class="control-group__label">
+            Hiệu ứng
+            <span class="info-icon">?<span class="info-tooltip"><b>Outline:</b> Tự động vẽ thêm một đường viền bao quanh toàn bộ hình ảnh sau khi xử lý. Giúp nhân vật nổi bật hơn.</span></span>
+          </label>
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+            <input type="checkbox" id="outlineMode" style="width:16px; height:16px; accent-color:var(--md-primary);">
+            <span>Tạo đường viền (Outline)</span>
+          </label>
+          <div id="outlineColorGroup" style="display:none; align-items:center; gap:8px; margin-top:4px;">
+             <input type="color" id="outlineColor" value="#000000" style="width:24px; height:24px; padding:0; border:none; cursor:pointer; background:none;">
+             <span class="number-input__hint">Màu viền</span>
+          </div>
+        </div>
+
+        <!-- Target Width -->
+        <div class="control-group">
+          <label class="control-group__label" for="targetWidth">
+            Chiều rộng mục tiêu
+            <span class="info-icon">?<span class="info-tooltip">Kích thước (pixel) chiều ngang mong muốn cho ảnh kết quả. Càng nhỏ hình càng rỗ. Để trống để tự động phát hiện ô lưới.</span></span>
+          </label>
+          <div class="number-input">
+            <input type="number" id="targetWidth" min="2" max="512" placeholder="Tự phát hiện">
+            <span class="number-input__hint">px (để trống = auto)</span>
+          </div>
+        </div>
+
+        <!-- Median Radius -->
+        <div class="control-group">
+          <label class="control-group__label">
+            Median Filter Radius
+            <span class="info-icon">?<span class="info-tooltip">Độ mạnh của bộ lọc nhiễu. Mức 0: Giữ nguyên chi tiết gốc (có thể bị nhiễu hạt). Mức cao: Làm bẹt các mảng màu, giảm chi tiết vụn vặt giúp ảnh trông giống tranh vẽ hơn.</span></span>
+          </label>
+          <div class="slider-row">
+            <input type="range" id="medianRadius" min="0" max="3" value="1" step="1">
+            <span class="slider-value" id="medianVal">1</span>
+          </div>
+        </div>
+
+        <!-- Max Colors -->
+        <div class="control-group">
+          <label class="control-group__label">
+            Số màu tối đa
+            <span class="info-icon">?<span class="info-tooltip">Giới hạn số lượng màu sắc trên ảnh để tạo phong cách Retro thực sự. Càng ít màu ảnh càng mang tính "pixel art".</span></span>
+          </label>
+          <div class="slider-row">
+            <input type="range" id="maxColors" min="2" max="64" value="16" step="1">
+            <span class="slider-value" id="colorsVal">16</span>
+          </div>
+        </div>
+
+        <!-- Locked Colors -->
+        <div class="control-group" id="lockedColorsGroup" style="display:none">
+          <label class="control-group__label">
+            Màu được giữ lại (Khóa)
+            <span class="info-icon">?<span class="info-tooltip">Bấm vào các vùng màu quan trọng trên ảnh gốc bên trái để "khóa" lại. Các màu này sẽ chắc chắn xuất hiện trong bảng màu của ảnh tạo ra, giúp không bị mất chi tiết quan trọng (VD: Mắt, màu da đặc trưng).</span></span>
+          </label>
+          <div class="locked-colors" id="lockedColorsList"></div>
+          <span class="number-input__hint">Click vào ảnh gốc để chọn màu bắt buộc</span>
+        </div>
+
+
+        <!-- Batch Export Settings -->
+        <div class="control-group" id="batchSettingsGroup" style="display:none; background: rgba(var(--md-primary-rgb), 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(var(--md-primary-rgb), 0.2);">
+          <label class="control-group__label">Xuất hàng loạt (Batch)</label>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <div style="flex:1">
+              <span class="number-input__hint">Tiền tố (Prefix)</span>
+              <input type="text" id="batchPrefix" placeholder="pixel_" style="width:100%; border-radius:4px; border:none; padding:4px 8px; font-family:inherit; background:var(--md-surface-variant); color:var(--md-on-surface);">
+            </div>
+            <div style="width:60px">
+              <span class="number-input__hint">Bắt đầu từ</span>
+              <input type="number" id="batchStartIndex" value="1" min="0" style="width:100%; border-radius:4px; border:none; padding:4px 8px; font-family:inherit; background:var(--md-surface-variant); color:var(--md-on-surface);">
+            </div>
+          </div>
+          <span class="number-input__hint" id="batchInfoText">Ảnh sẽ được nén thành file ZIP.</span>
+        </div>
+
+        <!-- Actions -->
+        <div class="btn-group">
+          <button class="btn btn--primary" id="btnProcess" disabled>
+            ⚡ Xử lý ảnh
+          </button>
+          <button class="btn btn--tonal" id="btnExport" disabled>
+            <span id="exportBtnText" style="pointer-events:none;">💾 Xuất PNG</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Processing Overlay -->
+  <div class="processing-overlay" id="processingOverlay">
+    <div style="text-align:center">
+      <div class="processing-spinner"></div>
+      <div class="processing-label">Đang xử lý…</div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
